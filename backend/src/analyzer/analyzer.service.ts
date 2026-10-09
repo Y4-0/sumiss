@@ -11,12 +11,12 @@ export interface AnalysisResult {
   score: number;
   tags: string[];
   datesExtracted: string[];
-  semanticColor: string; 
+  semanticColor: string;
 }
 
 @Injectable()
 export class AnalyzerService {
-  public async analyzeMessage(rawText: string, config: AnalyzerConfig, engine: string): Promise<AnalysisResult> {
+  public async analyzeMessage(rawText: string, config: AnalyzerConfig): Promise<AnalysisResult> {
     if (rawText.trim().length === 0) {
       return { isMention: false, score: -100, tags: [], datesExtracted: [], semanticColor: '#888888' };
     }
@@ -37,15 +37,10 @@ Message to analyze:
     `.trim();
 
     try {
-      let result;
-      if (engine === 'gemini') {
-        result = await this.analyzeWithGemini(prompt);
-      } else {
-        result = await this.analyzeWithOllama(prompt);
-      }
+      let result = await this.analyzeWithGemini(prompt);
 
       // Resolve Semantic Color based on prioritized tags
-      let semanticColor = '#888888'; 
+      let semanticColor = '#888888';
       if (result.tags?.includes('Mention')) {
         semanticColor = '#EF4444'; // Red
       } else if (result.tags?.includes('Question') || result.tags?.includes('Task') || result.tags?.includes('CustomKeyword')) {
@@ -68,43 +63,70 @@ Message to analyze:
     }
   }
 
-  private async analyzeWithOllama(prompt: string) {
-    const ollamaModel = process.env.OLLAMA_MODEL || 'qwen3.5:9b';
-    const response = await fetch('http://127.0.0.1:11434/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: ollamaModel,
-        prompt: prompt,
-        stream: false,
-        format: 'json'
-      })
-    });
-    if (!response.ok) throw new Error('Ollama connection failed');
-    const data = await response.json();
-    return JSON.parse(data.response);
+  public async generateSummary(messages: any[]): Promise<string> {
+    if (messages.length === 0) return "No messages available to summarize.";
+
+    // Only send the most relevant parts to avoid exceeding token limits
+    const chatLog = messages.map(m => `[${new Date(m.timestamp).toLocaleString()}] ${m.sender}: ${m.rawText}`).join('\n');
+
+    const prompt = `
+You are an executive assistant analyzing a chat log.
+Please provide a concise, human-readable summary of the following chat history. 
+Focus strictly on:
+1. Priorities of any meetings being held, and if anything is being rescheduled or changed.
+2. Important mentions or tasks demanding attention.
+
+Return the summary as plain text (or markdown for readability). Do NOT return JSON.
+
+Chat History:
+${chatLog}
+    `.trim();
+
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GEMINI_API_KEY is not set in backend/.env');
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Gemini API Error');
+      }
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "Failed to generate summary.";
+    } catch (e: any) {
+      console.error(e.message);
+      return "An error occurred while generating the summary.";
+    }
   }
 
   private async analyzeWithGemini(prompt: string) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY is not set in backend/.env');
-    
+
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-            responseMimeType: 'application/json'
+          responseMimeType: 'application/json'
         }
       })
     });
     if (!response.ok) {
-       const errorData = await response.json();
-       throw new Error('Gemini API Error: ' + JSON.stringify(errorData));
+      const errorData = await response.json();
+      throw new Error('Gemini API Error: ' + JSON.stringify(errorData));
     }
     const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    // Strip markdown formatting if present
+    rawText = rawText.replace(/```json\n?|```/g, '').trim();
     return JSON.parse(rawText);
   }
 }

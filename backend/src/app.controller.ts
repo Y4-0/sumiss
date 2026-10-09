@@ -4,20 +4,25 @@ import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly appService: AppService) { }
 
   @Get('messages')
   getMessages() {
     return this.appService.getMessages();
   }
 
+  @Get('summary')
+  getSummary() {
+    return this.appService.getSummary();
+  }
+
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  uploadFile(@UploadedFile() file: any, @Body('engine') engine: string) {
+  uploadFile(@UploadedFile() file: any) {
     if (!file) return { error: 'No file provided' };
     const content = file.buffer.toString('utf-8');
     const filename = file.originalname || 'Unknown_Source.txt';
-    return this.appService.processChat(content, filename, engine || 'ollama');
+    return this.appService.processChat(content, filename);
   }
 
   @Delete('sources/:name')

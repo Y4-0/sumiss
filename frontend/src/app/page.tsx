@@ -73,7 +73,7 @@ export default function Dashboard() {
 
   const removeSource = async (sourceName: string) => {
     if (!confirm(`Are you sure you want to remove all chats from ${sourceName}?`)) return;
-    
+
     try {
       await fetch(`http://localhost:4000/sources/${encodeURIComponent(sourceName)}`, {
         method: 'DELETE'
@@ -104,7 +104,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen w-full bg-[var(--background)] text-[var(--foreground)] font-sans overflow-hidden">
-      
+
       {/* LOADING OVERLAY */}
       {isUploading && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
@@ -120,7 +120,7 @@ export default function Dashboard() {
       <aside className="w-64 border-r border-[#333] flex flex-col p-4 space-y-6">
         <div>
           <h2 className="text-xl font-bold mb-4 tracking-tight">Sumiss</h2>
-          
+
           {/* AI ENGINE TOGGLE */}
           <div className="bg-[#1a1a1a] p-1 rounded-md flex mb-4 text-xs font-semibold">
             <button
@@ -138,7 +138,7 @@ export default function Dashboard() {
           </div>
 
           <input type="file" ref={fileInputRef} className="hidden" accept=".txt" onChange={handleFileChange} />
-          <button 
+          <button
             onClick={handleUploadClick}
             disabled={isUploading}
             className="w-full bg-[var(--surface)] hover:bg-[#333] border border-[#333] text-white py-2 rounded-md font-medium transition-colors disabled:opacity-50"
@@ -151,14 +151,13 @@ export default function Dashboard() {
           <h3 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-2">Smart Views</h3>
           <ul className="space-y-1">
             {['Inbox', 'Mentions', 'Meetings', 'Questions'].map((filter) => (
-              <li 
+              <li
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
-                className={`px-3 py-2 rounded-md cursor-pointer text-sm font-medium transition-colors flex justify-between ${
-                  activeFilter === filter 
-                    ? 'bg-[var(--surface)] text-white' 
-                    : 'hover:bg-[var(--surface)] text-[var(--muted)] hover:text-white'
-                }`}
+                className={`px-3 py-2 rounded-md cursor-pointer text-sm font-medium transition-colors flex justify-between ${activeFilter === filter
+                  ? 'bg-[var(--surface)] text-white'
+                  : 'hover:bg-[var(--surface)] text-[var(--muted)] hover:text-white'
+                  }`}
               >
                 <span>{filter}</span> <span className="text-[var(--muted)]">{counts[filter as keyof typeof counts]}</span>
               </li>
@@ -169,15 +168,15 @@ export default function Dashboard() {
         <div>
           <h3 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-2">Chat Sources</h3>
           {sources.length === 0 ? (
-             <div className="text-center text-[var(--muted)] text-sm py-4 border border-dashed border-[#333] rounded-md">
-               Add a source to get started!
-             </div>
+            <div className="text-center text-[var(--muted)] text-sm py-4 border border-dashed border-[#333] rounded-md">
+              Add a source to get started!
+            </div>
           ) : (
             <ul className="space-y-1">
               {sources.map(src => (
                 <li key={src} className="flex justify-between items-center px-3 py-2 bg-[var(--surface)] rounded-md text-sm text-gray-300 group">
                   <span className="truncate" title={src}>{src}</span>
-                  <button 
+                  <button
                     onClick={() => removeSource(src)}
                     className="text-[var(--muted)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Remove source"
@@ -196,19 +195,19 @@ export default function Dashboard() {
         <header className="h-14 border-b border-[#333] flex items-center px-6">
           <h1 className="text-lg font-semibold">{activeFilter}</h1>
         </header>
-        
+
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          
+
           {filteredMessages.length === 0 && (
-             <div className="text-center text-[var(--muted)] mt-10">
-               {sources.length === 0 ? "No chat history uploaded yet." : `No messages found in ${activeFilter}.`}
-             </div>
+            <div className="text-center text-[var(--muted)] mt-10">
+              {sources.length === 0 ? "No chat history uploaded yet." : `No messages found in ${activeFilter}.`}
+            </div>
           )}
 
           {filteredMessages.map((msg) => {
             const dateStr = new Date(msg.timestamp).toLocaleString();
             const senderInitials = msg.sender ? msg.sender.substring(0, 2).toUpperCase() : '??';
-            
+
             let bgClass = 'bg-[#888888]/20 text-[#888888]';
             let borderClass = 'border-[#888888]';
             if (msg.semanticColor === '#EF4444') { bgClass = 'bg-[#EF4444]/20 text-[#EF4444]'; borderClass = 'border-[#EF4444]'; }
@@ -227,9 +226,9 @@ export default function Dashboard() {
                   </div>
                   <div className="flex space-x-2">
                     {msg.tags.map((tag: string) => (
-                       <span key={tag} className={`px-2 py-1 text-[10px] uppercase font-bold rounded ${bgClass}`}>
-                         {tag}
-                       </span>
+                      <span key={tag} className={`px-2 py-1 text-[10px] uppercase font-bold rounded ${bgClass}`}>
+                        {tag}
+                      </span>
                     ))}
                   </div>
                 </div>
