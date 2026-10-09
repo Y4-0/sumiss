@@ -20,6 +20,11 @@ export default function Dashboard() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [summary, setSummary] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [engine, setEngine] = useState('gemini');
+  const [username, setUsername] = useState('you');
+  const [geminiQuota, setGeminiQuota] = useState(20);
+  const [sourceEngines, setSourceEngines] = useState<Record<string, string>>({});
+  const [resetTimer, setResetTimer] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Derive unique sources from messages
@@ -55,6 +60,24 @@ export default function Dashboard() {
   useEffect(() => {
     fetchMessages();
     fetchSummary();
+
+    const updateTimer = () => {
+      const now = new Date();
+      const laTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
+      const nextMidnight = new Date(laTime);
+      nextMidnight.setHours(24, 0, 0, 0);
+      
+      const diff = nextMidnight.getTime() - laTime.getTime();
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      setResetTimer(`${h}h ${m}m ${s}s`);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleUploadClick = () => {
@@ -66,7 +89,7 @@ export default function Dashboard() {
     if (!file) return;
 
     setIsUploading(true);
-    setUploadStatus(`Uploading and parsing ${file.name} with Gemini API... This might take a minute depending on the file size.`);
+    setUploadStatus(`Uploading ${file.name}...`);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -77,7 +100,6 @@ export default function Dashboard() {
         body: formData,
       });
       await fetchMessages();
-      await fetchSummary();
     } catch (e) {
       console.error("Upload failed", e);
       alert("Upload failed. Ensure the backend is running.");
@@ -85,6 +107,32 @@ export default function Dashboard() {
       setIsUploading(false);
       setUploadStatus('');
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleAnalyzeSource = async (sourceName: string) => {
+    setIsUploading(true);
+    setUploadStatus(`Analyzing ${sourceName} using ${engine === 'gemini' ? 'Gemini AI' : 'Lexical'}...`);
+
+    try {
+      const res = await fetch('http://localhost:4000/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceName, engine, username })
+      });
+      const data = await res.json();
+      if (data.geminiRequestsUsed) {
+        setGeminiQuota(prev => Math.max(0, prev - data.geminiRequestsUsed));
+      }
+      setSourceEngines(prev => ({...prev, [sourceName]: engine}));
+      await fetchMessages();
+      await fetchSummary();
+    } catch (e) {
+      console.error("Analysis failed", e);
+      alert("Analysis failed.");
+    } finally {
+      setIsUploading(false);
+      setUploadStatus('');
     }
   };
 
@@ -102,7 +150,9 @@ export default function Dashboard() {
     }
   };
 
-  const filteredMessages = messages.filter((msg) => {
+  const analyzedMessages = messages.filter(m => m.score !== -999 && m.score > 0);
+
+  const filteredMessages = analyzedMessages.filter((msg) => {
     if (activeFilter === 'Inbox') return true;
     if (activeFilter === 'Mentions') return msg.tags.includes('Mention');
     if (activeFilter === 'Meetings') return msg.tags.includes('Scheduling');
@@ -112,10 +162,10 @@ export default function Dashboard() {
 
   const getFilterCounts = () => {
     return {
-      Inbox: messages.length,
-      Mentions: messages.filter(m => m.tags.includes('Mention')).length,
-      Meetings: messages.filter(m => m.tags.includes('Scheduling')).length,
-      Questions: messages.filter(m => m.tags.includes('Question') || m.tags.includes('Task')).length,
+      Inbox: analyzedMessages.length,
+      Mentions: analyzedMessages.filter(m => m.tags.includes('Mention')).length,
+      Meetings: analyzedMessages.filter(m => m.tags.includes('Scheduling')).length,
+      Questions: analyzedMessages.filter(m => m.tags.includes('Question') || m.tags.includes('Task')).length,
     }
   };
   const counts = getFilterCounts();
@@ -143,10 +193,52 @@ export default function Dashboard() {
           <button
             onClick={handleUploadClick}
             disabled={isUploading}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-2.5 rounded-lg font-bold shadow-lg shadow-blue-500/20 transition-all duration-300 hover:shadow-blue-500/40 hover:-translate-y-0.5 disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-2.5 rounded-lg font-bold shadow-lg shadow-blue-500/20 transition-all duration-300 hover:shadow-blue-500/40 hover:-translate-y-0.5 disabled:opacity-50 mb-4"
           >
             + Upload Export
           </button>
+
+          <div className="bg-black/40 rounded-lg p-3 border border-white/5 shadow-inner mb-4">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Your Username</h3>
+            <input 
+              type="text" 
+              value={username} 
+              onChange={e => setUsername(e.target.value)} 
+              className="w-full bg-[#1a1a1a] border border-white/10 rounded-md px-3 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 transition-colors" 
+              placeholder="e.g. John" 
+            />
+            <p className="text-[9px] text-gray-500 mt-1.5">Required for tracking @mentions.</p>
+          </div>
+        </div>
+
+        <div className="bg-black/40 rounded-lg p-3 border border-white/5 shadow-inner">
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Analysis Engine</h3>
+          <div className="flex space-x-2">
+            <button 
+              onClick={() => setEngine('gemini')} 
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${engine === 'gemini' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-[0_0_10px_rgba(99,102,241,0.2)]' : 'bg-transparent text-gray-500 hover:text-gray-300 border border-transparent'}`}
+            >
+              Gemini AI
+            </button>
+            <button 
+              onClick={() => setEngine('lexical')} 
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${engine === 'lexical' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-transparent text-gray-500 hover:text-gray-300 border border-transparent'}`}
+            >
+              Lexical (Local)
+            </button>
+          </div>
+          {engine === 'gemini' && (
+            <div className="mt-3 pt-3 border-t border-white/5 animate-in fade-in zoom-in duration-300">
+               <div className="flex justify-between items-center text-xs mb-1.5">
+                 <span className="text-gray-400 font-medium">Daily API Quota</span>
+                 <span className={`font-bold ${geminiQuota > 5 ? 'text-indigo-400' : 'text-red-400'}`}>{geminiQuota} / 20 reqs</span>
+               </div>
+               <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                 <div className={`h-1.5 rounded-full transition-all duration-500 ${geminiQuota > 5 ? 'bg-gradient-to-r from-blue-500 to-indigo-500' : 'bg-red-500'}`} style={{ width: `${(geminiQuota / 20) * 100}%` }}></div>
+               </div>
+               <p className="text-[9px] text-gray-400 mt-1.5 text-right font-medium">Resets in <span className="font-mono text-indigo-400 font-bold">{resetTimer}</span></p>
+            </div>
+          )}
         </div>
 
         <div>
@@ -174,19 +266,48 @@ export default function Dashboard() {
               Add a source to get started!
             </div>
           ) : (
-            <ul className="space-y-1">
-              {sources.map(src => (
-                <li key={src} className="flex justify-between items-center px-3 py-2 bg-[var(--surface)] rounded-md text-sm text-gray-300 group">
-                  <span className="truncate" title={src}>{src}</span>
-                  <button
-                    onClick={() => removeSource(src)}
-                    className="text-[var(--muted)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove source"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                  </button>
-                </li>
-              ))}
+            <ul className="space-y-2">
+              {sources.map(src => {
+                const hasUnanalyzed = messages.some(m => m.sourceName === src && m.score === -999);
+                const lastEngine = sourceEngines[src];
+                const needsAnalysis = hasUnanalyzed || lastEngine !== engine;
+                
+                return (
+                  <li key={src} className="flex flex-col px-3 py-2.5 bg-[#1a1a1a] rounded-md group border border-white/5 hover:border-white/10 transition-colors">
+                    <div className="flex justify-between items-center text-sm text-gray-300">
+                      <span className="truncate font-medium" title={src}>{src}</span>
+                      <button
+                        onClick={() => removeSource(src)}
+                        className="text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0"
+                        title="Remove source"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                      </button>
+                    </div>
+                    {needsAnalysis ? (
+                      <div className="mt-2.5 flex justify-between items-center">
+                        <span className="text-[10px] text-gray-500 font-bold tracking-wide">
+                          {hasUnanalyzed ? 'Ready for analysis' : 'Ready for re-analysis'}
+                        </span>
+                        <button 
+                          onClick={() => handleAnalyzeSource(src)} 
+                          disabled={isUploading || (engine === 'gemini' && geminiQuota <= 0)}
+                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[10px] uppercase font-bold py-1 px-3 rounded shadow-lg disabled:opacity-50 transition-colors"
+                        >
+                          {hasUnanalyzed ? 'Analyze' : 'Re-analyze'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-2.5 flex justify-between items-center">
+                        <span className="text-[10px] text-emerald-500/80 font-bold tracking-wide flex items-center">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                          Analyzed with {engine}
+                        </span>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

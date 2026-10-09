@@ -32,3 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optimized `AnalyzerService` with prompt-batching to analyze 100 messages concurrently in a single API request, bypassing strict rate limits.
 - Implemented global `generateSummary` endpoint powered by Gemini to generate "Executive Summaries" of uploaded chats.
 - Refactored frontend UI with premium glassmorphism, dynamic gradients, and animated elements. Removed all deprecated Ollama engine toggles.
+- Decoupled upload and analysis, allowing files to be queued as "Unanalyzed" sources.
+- Re-introduced the Lexical (Local) scanning option using `chrono-node` as an instant alternative to Gemini.
+- Added a dynamic "Analysis Engine" toggle in the frontend (Gemini AI vs Lexical).
+- Added an explicit "Your Username" field to correctly track direct `@mentions` and filter out hallucinated mentions of "you".
+- Implemented a "Re-analyze" feature that dynamically appears on analyzed sources when switching between engines.
+- Added a live mathematical countdown timer in the UI displaying time remaining until midnight PST for Gemini API quota resets.
+- Refined the Gemini prompt to aggressively flag chat system messages (e.g. "joined using a group link") as noise with a score of `-100`.

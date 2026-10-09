@@ -25,6 +25,12 @@ export class AppController {
     return this.appService.processChat(content, filename);
   }
 
+  @Post('analyze')
+  analyzeSource(@Body('sourceName') sourceName: string, @Body('engine') engine: string, @Body('username') username: string) {
+    if (!sourceName) return { error: 'No source provided' };
+    return this.appService.analyzeSource(sourceName, engine, username);
+  }
+
   @Delete('sources/:name')
   deleteSource(@Param('name') name: string) {
     return this.appService.deleteSource(name);
