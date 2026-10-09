@@ -23,7 +23,7 @@ export class AppService {
     return { success: true };
   }
 
-  async processChat(content: string, sourceName: string) {
+  async processChat(content: string, sourceName: string, engine: string) {
     const lines = content.split('\n');
     let currentMessage = '';
     let currentSender = '';
@@ -40,7 +40,7 @@ export class AppService {
 
     const flushMessage = async () => {
       if (currentMessage.trim()) {
-        const analysis = await this.analyzer.analyzeMessage(currentMessage, config);
+        const analysis = await this.analyzer.analyzeMessage(currentMessage, config, engine);
         messagesToSave.push({
           rawText: currentMessage,
           sender: currentSender || 'Unknown',

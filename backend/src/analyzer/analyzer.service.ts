@@ -16,7 +16,7 @@ export interface AnalysisResult {
 
 @Injectable()
 export class AnalyzerService {
-  public async analyzeMessage(rawText: string, config: AnalyzerConfig): Promise<AnalysisResult> {
+  public async analyzeMessage(rawText: string, config: AnalyzerConfig, engine: string): Promise<AnalysisResult> {
     if (rawText.trim().length === 0) {
       return { isMention: false, score: -100, tags: [], datesExtracted: [], semanticColor: '#888888' };
     }
@@ -37,25 +37,12 @@ Message to analyze:
     `.trim();
 
     try {
-      const ollamaModel = process.env.OLLAMA_MODEL || 'qwen3.5:9b';
-      
-      const response = await fetch('http://127.0.0.1:11434/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: ollamaModel,
-          prompt: prompt,
-          stream: false,
-          format: 'json'
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Ollama connection failed');
+      let result;
+      if (engine === 'gemini') {
+        result = await this.analyzeWithGemini(prompt);
+      } else {
+        result = await this.analyzeWithOllama(prompt);
       }
-
-      const data = await response.json();
-      const result = JSON.parse(data.response);
 
       // Resolve Semantic Color based on prioritized tags
       let semanticColor = '#888888'; 
@@ -75,9 +62,49 @@ Message to analyze:
         semanticColor: semanticColor
       };
     } catch (e) {
-      console.error('Ollama Error:', e);
+      console.error(e.message);
       // Fallback for failure
       return { isMention: false, score: 0, tags: [], datesExtracted: [], semanticColor: '#888888' };
     }
+  }
+
+  private async analyzeWithOllama(prompt: string) {
+    const ollamaModel = process.env.OLLAMA_MODEL || 'qwen3.5:9b';
+    const response = await fetch('http://127.0.0.1:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: ollamaModel,
+        prompt: prompt,
+        stream: false,
+        format: 'json'
+      })
+    });
+    if (!response.ok) throw new Error('Ollama connection failed');
+    const data = await response.json();
+    return JSON.parse(data.response);
+  }
+
+  private async analyzeWithGemini(prompt: string) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY is not set in backend/.env');
+    
+    const response = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\${apiKey}\`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+            responseMimeType: 'application/json'
+        }
+      })
+    });
+    if (!response.ok) {
+       const errorData = await response.json();
+       throw new Error('Gemini API Error: ' + JSON.stringify(errorData));
+    }
+    const data = await response.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    return JSON.parse(rawText);
   }
 }

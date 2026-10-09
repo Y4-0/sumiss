@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [aiEngine, setAiEngine] = useState('ollama'); // 'ollama' | 'gemini'
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Derive unique sources from messages
@@ -48,10 +49,11 @@ export default function Dashboard() {
     if (!file) return;
 
     setIsUploading(true);
-    setUploadStatus(`Uploading and parsing ${file.name} with AI... This might take a minute depending on the file size.`);
+    setUploadStatus(`Uploading and parsing ${file.name} with ${aiEngine === 'gemini' ? 'Gemini API' : 'Local Ollama'}... This might take a minute depending on the file size.`);
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('engine', aiEngine);
 
     try {
       await fetch('http://localhost:4000/upload', {
@@ -118,11 +120,28 @@ export default function Dashboard() {
       <aside className="w-64 border-r border-[#333] flex flex-col p-4 space-y-6">
         <div>
           <h2 className="text-xl font-bold mb-4 tracking-tight">Sumiss</h2>
+          
+          {/* AI ENGINE TOGGLE */}
+          <div className="bg-[#1a1a1a] p-1 rounded-md flex mb-4 text-xs font-semibold">
+            <button
+              onClick={() => setAiEngine('ollama')}
+              className={`flex-1 py-1.5 rounded transition-colors ${aiEngine === 'ollama' ? 'bg-[var(--accent)] text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Local (Ollama)
+            </button>
+            <button
+              onClick={() => setAiEngine('gemini')}
+              className={`flex-1 py-1.5 rounded transition-colors ${aiEngine === 'gemini' ? 'bg-[var(--accent)] text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Gemini API
+            </button>
+          </div>
+
           <input type="file" ref={fileInputRef} className="hidden" accept=".txt" onChange={handleFileChange} />
           <button 
             onClick={handleUploadClick}
             disabled={isUploading}
-            className="w-full bg-[var(--accent)] text-white py-2 rounded-md font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="w-full bg-[var(--surface)] hover:bg-[#333] border border-[#333] text-white py-2 rounded-md font-medium transition-colors disabled:opacity-50"
           >
             + Upload Export
           </button>
