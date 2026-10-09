@@ -61,7 +61,7 @@ Message to analyze:
         datesExtracted: result.datesExtracted || [],
         semanticColor: semanticColor
       };
-    } catch (e) {
+    } catch (e: any) {
       console.error(e.message);
       // Fallback for failure
       return { isMention: false, score: 0, tags: [], datesExtracted: [], semanticColor: '#888888' };
