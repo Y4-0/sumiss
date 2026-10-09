@@ -1,0 +1,22 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Message {
+  id            String   @id @default(uuid())
+  rawText       String
+  sender        String?
+  timestamp     DateTime
+  isMention     Boolean  @default(false)
+  score         Int      @default(0)
+  tags          String[]
+  semanticColor String?
+  sourceName    String?
+  
+  createdAt     DateTime @default(now())
+}
