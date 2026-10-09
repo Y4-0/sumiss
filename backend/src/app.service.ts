@@ -82,19 +82,19 @@ export class AppService {
     }
     flushRawMessage();
 
-    // Process messages in chunks to prevent rate limiting but keep it concurrent
-    const chunkSize = 10;
+    // Process messages in larger chunks to prevent free tier rate limiting (5 RPM)
+    const chunkSize = 100;
     const messagesToSave: any[] = [];
     
     for (let i = 0; i < rawMessages.length; i += chunkSize) {
       const chunk = rawMessages.slice(i, i + chunkSize);
-      const analyses = await Promise.all(
-        chunk.map(msg => this.analyzer.analyzeMessage(msg.rawText, config))
-      );
+      
+      // Batch analyze up to 100 messages in a single Gemini request
+      const analyses = await this.analyzer.analyzeMessagesBatch(chunk.map(msg => msg.rawText), config);
       
       for (let j = 0; j < chunk.length; j++) {
         const msg = chunk[j];
-        const analysis = analyses[j];
+        const analysis = analyses[j] || { isMention: false, score: 0, tags: [], datesExtracted: [], semanticColor: '#888888' };
         messagesToSave.push({
           rawText: msg.rawText,
           sender: msg.sender,

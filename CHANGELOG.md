@@ -27,3 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a new `sourceName` column to Prisma schema and updated the NestJS controller.
 - Implemented `Remove Source` feature in the frontend sidebar to gracefully delete chat records from the DB by filename.
 - Downgraded Prisma from v8 RC to v5 stable to prevent schema sync and client generation typescript crashes.
+- **Breaking/Architecture**: Fully removed local Ollama integration to improve speed and reliability.
+- **Breaking/Architecture**: Migrated analyzer engine to use Google's Gemini API (`gemini-flash-lite-latest`).
+- Optimized `AnalyzerService` with prompt-batching to analyze 100 messages concurrently in a single API request, bypassing strict rate limits.
+- Implemented global `generateSummary` endpoint powered by Gemini to generate "Executive Summaries" of uploaded chats.
+- Refactored frontend UI with premium glassmorphism, dynamic gradients, and animated elements. Removed all deprecated Ollama engine toggles.
